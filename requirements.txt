@@ -1,0 +1,11 @@
+streamlit
+speechbrain
+torch
+torchaudio
+numpy
+pandas
+seaborn
+matplotlib
+scipy
+scikit-learn
+soundfile

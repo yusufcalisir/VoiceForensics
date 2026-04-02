@@ -1,0 +1,28 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+
+# Virtual environments
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Audio caches / heavy datasets
+temp_audio/
+temp_extract/
+*.tar.gz
+*.tgz
+*.zip
+
+# Sensitive / debug files
+backend_out.txt
+error.txt
+.env
+
+# Model caches
+.cache/
+pretrained_models/
