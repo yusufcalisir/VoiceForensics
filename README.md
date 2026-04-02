@@ -4,6 +4,7 @@
 [![Framework](https://img.shields.io/badge/Framework-PyTorch%20%7C%20SpeechBrain-orange.svg)](https://speechbrain.github.io/)
 [![UI](https://img.shields.io/badge/UI-Streamlit-red.svg)](https://streamlit.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Language](https://img.shields.io/badge/Language-EN%20%7C%20TR-blueviolet.svg)](#-multilingual-support)
 
 **🔗 Live Demo Application:** [https://voiceforensics.streamlit.app/](https://voiceforensics.streamlit.app/)
 
@@ -26,6 +27,14 @@ Traditional speaker identification systems (including commercial APIs) typically
 3.  **Explainable AI (XAI)**: A transparent "Forensic Rationale" interface generates human-readable text detailing the exact telemetry and algorithmic behavior that forced the final decision.
 
 4.  **Adversarial Robustness Simulation**: Natively tests audio clips under deterministic permutations (background noise simulation, matrix segment slicing) and artificially restricts the core confidence score if the neural network flickers under stress.
+
+---
+
+## 🌍 Multilingual Support
+
+VoiceForensics ships with full **English** and **Turkish (Türkçe)** localization. Toggle between languages using the 🌐 button in the sidebar. All UI elements, forensic analysis reports, adversarial diagnostics, and system explanations are fully translated with professional, domain-specific forensic terminology — not machine-translated.
+
+Translations are centralized in `translations.py`. To add a new language, simply extend the dictionary with a new `xx_dict` and register it in the `t()` helper function.
 
 ---
 

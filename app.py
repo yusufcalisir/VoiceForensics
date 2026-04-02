@@ -7,10 +7,53 @@ import os
 import hashlib
 from scipy.stats import zscore
 import core
+from translations import t
+
+# Handle Lang
+if "lang" not in st.session_state:
+    st.session_state.lang = "en"
+l = st.session_state.lang
+
+# Dynamic JS Translator for hardcoded Streamlit elements
+import streamlit.components.v1 as components
+target_btn = 'Dosya Seç' if l == 'tr' else 'Browse files'
+target_desc = 'Dosya başı limit: 200MB | WAV, MP3, FLAC' if l == 'tr' else 'Limit 200MB per file \u2022 WAV, MP3, FLAC'
+components.html(f'''
+<script>
+const targetBtn = "{target_btn}";
+const targetDesc = "{target_desc}";
+const translateStreamlit = () => {{
+    const parentDoc = window.parent.document;
+    if (!parentDoc) return;
+    const uploaderBtns = parentDoc.querySelectorAll('[data-testid="stFileUploader"] button');
+    uploaderBtns.forEach(btn => {{
+        if (btn.innerHTML.includes('Upload') || btn.innerHTML.includes('Browse files') || btn.innerHTML.includes('Dosya Seç')) {{
+            if (!btn.innerHTML.includes(targetBtn)) {{
+                btn.innerHTML = btn.innerHTML.replace(/Upload|Browse files|Dosya Seç/g, targetBtn);
+            }}
+        }}
+    }});
+    const instructions = parentDoc.querySelectorAll('[data-testid="stFileUploaderDropzoneInstructions"]');
+    instructions.forEach(inst => {{
+        if (inst.innerHTML.includes('200MB per file') || inst.innerHTML.includes('Dosya başı limit: 200MB')) {{
+            if (!inst.innerHTML.includes(targetDesc)) {{
+                inst.innerHTML = inst.innerHTML.replace(/(200MB per file[^<]*|Dosya başı limit: 200MB[^<]*)/g, targetDesc);
+            }}
+        }}
+    }});
+}};
+if (window.parent.document.streamlitTranslateObserver) {{
+    window.parent.document.streamlitTranslateObserver.disconnect();
+}}
+window.parent.document.streamlitTranslateObserver = new MutationObserver(() => translateStreamlit());
+window.parent.document.streamlitTranslateObserver.observe(window.parent.document.body, {{ childList: true, subtree: true }});
+translateStreamlit();
+</script>
+''', height=0, width=0)
 
 # Premium UI Configuration
 st.set_page_config(
-    page_title="Speaker Identity Engine | Premium",
+    page_title=t("page_title", l),
     page_icon="🎙️",
     layout="wide"
 )
@@ -95,6 +138,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+
+
 # --- Caching ---
 @st.cache_data(show_spinner=False)
 def cached_audio_process(file_bytes_hash, file_name, file_bytes):
@@ -105,68 +151,81 @@ def cached_audio_process(file_bytes_hash, file_name, file_bytes):
     return core.process_audio(temp_path)
 
 @st.cache_data(show_spinner=False)
-def cached_stability_score(file_bytes_hash, file_name, file_bytes):
-    os.makedirs("temp_audio", exist_ok=True)
+def cached_stability_score(file_name):
     temp_path = os.path.join("temp_audio", file_name)
-    if not os.path.exists(temp_path):
-        with open(temp_path, "wb") as f_out:
-            f_out.write(file_bytes)
-    return core.compute_stability_score(temp_path)
+    if os.path.exists(temp_path):
+        return core.compute_stability_score(temp_path)
+    return {"score": 0.0, "details": t("file_missing", l)}
 
 # ==========================================
 # SIDEBAR: Control Panel
 # ==========================================
 with st.sidebar:
     st.image("https://img.icons8.com/isometric/512/microphone.png", width=60)
-    st.title("Settings")
     
-    st.markdown("##### 📥 Data Source")
+    colTR, colEN = st.columns(2)
+    if colEN.button("🇬🇧 EN", use_container_width=True): 
+        st.session_state.lang = "en"
+        st.rerun()
+    if colTR.button("🇹🇷 TR", use_container_width=True): 
+        st.session_state.lang = "tr"
+        st.rerun()
+    l = st.session_state.lang
+
+    st.title(t("settings", l))
+    
+    st.markdown(f"##### {t('data_source', l)}")
     uploaded_files = st.file_uploader(
-        "Drop audio files",
+        t("drop_audio", l),
         accept_multiple_files=True,
         type=['wav', 'mp3', 'flac'],
-        help="Supports broadcast-quality WAV, FLAC, and common MP3s."
+        help=t("supports_audio", l)
     )
     n = len(uploaded_files) if uploaded_files else 0
     
-    st.markdown("##### ⚙️ Calibration")
-    calib_method = st.selectbox("Model", ["Auto", "Platt", "Isotonic", "Sigmoid"], index=0)
-    method_map = {"Auto": "auto", "Platt": "platt", "Isotonic": "isotonic", "Sigmoid": "sigmoid"}
+    st.markdown(f"##### {t('calibration', l)}")
+    calib_method = st.selectbox(t("model", l), [t("auto_model", l), "Platt", "Isotonic", "Sigmoid"], index=0)
+    method_map = {t("auto_model", l): "auto", "Platt": "platt", "Isotonic": "isotonic", "Sigmoid": "sigmoid"}
     
     if n > 1:
-        st.markdown("##### 📐 Thresholds")
-        trans_boundary = st.slider("Transitivity Focus", 0.50, 0.95, 0.70, 0.01)
-        apply_zscore = st.checkbox("Z-Score (N>=6)", value=False, disabled=(n < 6))
+        st.markdown(f"##### {t('thresholds', l)}")
+        trans_boundary = st.slider(t("transitivity_focus", l), 0.50, 0.95, 0.70, 0.01)
+        apply_zscore = st.checkbox(t("zscore", l), value=False, disabled=(n < 6))
         
         st.markdown("---")
-        st.markdown("##### 🏷️ Identity Labels")
+        st.markdown(f"##### {t('identity_labels', l)}")
         if "labels" not in st.session_state:
-            st.session_state.labels = {f.name: "Unknown" for f in uploaded_files}
+            st.session_state.labels = {f.name: "unknown" for f in uploaded_files}
         
+        # Retroactively fix any leaked TR strings from previous bugs
+        for k, v in st.session_state.labels.items():
+            if v == "Belirsiz" or v == "Unknown":
+                st.session_state.labels[k] = "unknown"
+                
         # Keep label editor in sidebar but make it clean
         label_df = pd.DataFrame([
-            {"File": f.name, "Speaker": st.session_state.labels.get(f.name, "Unknown")} 
+            {t("col_file", l): f.name, t("col_speaker", l): t("unknown", l) if st.session_state.labels.get(f.name) == "unknown" else st.session_state.labels.get(f.name)} 
             for f in uploaded_files
         ])
         edited = st.data_editor(label_df, use_container_width=True, hide_index=True, num_rows="fixed")
         for _, row in edited.iterrows():
-            st.session_state.labels[row["File"]] = row["Speaker"]
-        labels_mapped = dict(zip(edited["File"], edited["Speaker"]))
+            val = row[t("col_speaker", l)]
+            st.session_state.labels[row[t("col_file", l)]] = "unknown" if val == t("unknown", l) else val
+        labels_mapped = dict(zip(edited[t("col_file", l)], edited[t("col_speaker", l)]))
     else:
         labels_mapped = {}
 
 # ==========================================
 # MAIN: Results Dashboard
 # ==========================================
-st.title("Speaker Identity Intelligence")
+st.title(t("speaker_id_intel", l))
 
 if n > 1:
     # 1. Background Loading
     file_metrics, embeddings, file_names, file_stabilities = {}, {}, [], {}
     
-    with st.status("Analyzing specimens...", expanded=False) as status:
+    with st.status(t("analyzing_specimens", l), expanded=False) as status:
         for f in uploaded_files:
-            st.write(f"Extracting features from {f.name}...")
             file_bytes = f.read()
             fb_hash = hashlib.sha256(file_bytes).hexdigest()
             res = cached_audio_process(fb_hash, f.name, file_bytes)
@@ -174,13 +233,12 @@ if n > 1:
                 file_metrics[f.name] = res
                 embeddings[f.name] = res["embeddings"]
                 file_names.append(f.name)
-                file_stabilities[f.name] = cached_stability_score(fb_hash, f.name, file_bytes)
             f.seek(0)
-        status.update(label="Analysis Complete", state="complete", expanded=False)
+        status.update(label=t("initial_ingestion_complete", l), state="complete", expanded=False)
 
     n_proc = len(file_names)
     if n_proc < 2:
-        st.info("Upload at least two valid audio files to begin comparison.")
+        st.info(t("upload_at_least_two", l))
         st.stop()
 
     # 2. Similarity Matrix Logic
@@ -202,7 +260,7 @@ if n > 1:
     for i in range(n_proc):
         for j in range(i+1, n_proc):
             la, lb = labels_mapped.get(file_names[i]), labels_mapped.get(file_names[j])
-            if la and lb and la != "Unknown" and lb != "Unknown":
+            if la and lb and la != t("unknown", l) and lb != t("unknown", l):
                 if la == lb: same_scores.append(sim_matrix[i][j])
                 else: diff_scores.append(sim_matrix[i][j])
     
@@ -214,90 +272,128 @@ if n > 1:
         calibrator.fit_sigmoid_fallback([sim_matrix[i][j] for i in range(n_proc) for j in range(n_proc) if i != j])
 
     # 3. Selection & Prime Results
-    st.markdown("### 🧪 Pairwise Comparison")
+    st.markdown(f"### {t('pairwise_comparison', l)}")
     
     col_sel1, col_sel2 = st.columns(2)
-    with col_sel1: fa = st.selectbox("File A", file_names, index=0)
-    with col_sel2: fb = st.selectbox("File B", file_names, index=1 if n_proc > 1 else 0)
+    with col_sel1: fa = st.selectbox(t("file_a", l), file_names, index=0)
+    with col_sel2: fb = st.selectbox(t("file_b", l), file_names, index=1 if n_proc > 1 else 0)
     
     path_a = os.path.join("temp_audio", fa)
     path_b = os.path.join("temp_audio", fb)
-    pair_stab = core.compute_pairwise_perturbation_stability(path_a, path_b)
+    
+    with st.spinner(t("computing_precision", l)):
+        pair_stab = core.compute_pairwise_perturbation_stability(path_a, path_b)
+        stab_a = cached_stability_score(fa)
+        stab_b = cached_stability_score(fb)
     
     idx1, idx2 = file_names.index(fa), file_names.index(fb)
     penalties, _ = core.calculate_transitivity(sim_matrix, file_names, ui_strong_sim_threshold=trans_boundary)
     
     comp = core.compare_speakers(
         file_metrics[fa], file_metrics[fb], embeddings[fa], embeddings[fb],
-        file_stabilities.get(fa), file_stabilities.get(fb), pair_stab,
-        max(penalties[idx1], penalties[idx2]) * 2, calibrator, fa, fb
+        stab_a, stab_b, pair_stab,
+        max(penalties[idx1], penalties[idx2]) * 2, calibrator, fa, fb, lang=l
     )
 
     # Big Premium Metrics Row
     m1, m2, m3, m4 = st.columns(4)
     with m1:
-        d = comp["decision"].upper()
-        d_color = "#76ff03" if d == "SAME" else "#ff1744" if d == "DIFFERENT" else "#ffc107"
-        st.markdown(f"**Verdict**  \n<p style='font-size:32px; font-weight:900; color:{d_color}; margin:0;'>{d}</p>", unsafe_allow_html=True)
-    with m2: st.metric("Probability", f"{comp['calibrated_probability']:.1%}")
-    with m3: st.metric("Confidence", f"{comp['confidence']:.1%}")
+        d_val = comp["decision"].upper()
+        d_color = "#76ff03" if d_val == "SAME" else "#ff1744" if d_val == "DIFFERENT" else "#ffc107"
+        d_disp = t(d_val, l)
+        st.markdown(f"{t('verdict', l)}  \n<p style='font-size:32px; font-weight:900; color:{d_color}; margin:0;'>{d_disp}</p>", unsafe_allow_html=True)
+    with m2: st.metric(t("probability", l), f"{comp['calibrated_probability']:.1%}")
+    with m3: st.metric(t("confidence", l), f"{comp['confidence']:.1%}")
     with m4:
-        r = comp["risk"]
-        r_color = "#4caf50" if r['level'] == 'low' else "#ff9800" if r['level'] == 'medium' else "#f44336"
-        st.markdown(f"**Risk Profile**  \n<p style='font-size:32px; font-weight:900; color:{r_color}; margin:0;'>{r['level'].upper()}</p>", unsafe_allow_html=True)
+        r_level = comp["risk"]['level'].upper()
+        r_color = "#4caf50" if r_level == 'LOW' else "#ff9800" if r_level == 'MEDIUM' else "#f44336"
+        r_disp = t(r_level, l)
+        st.markdown(f"{t('risk_profile', l)}  \n<p style='font-size:32px; font-weight:900; color:{r_color}; margin:0;'>{r_disp}</p>", unsafe_allow_html=True)
 
     # 4. Insight Sections
     st.markdown("---")
-    res_tab1, res_tab2, res_tab3 = st.tabs(["📊 Performance Matrix", "🔬 Analysis Rationale", "📂 Specimen Data"])
+    res_tab1, res_tab2, res_tab3 = st.tabs([t("perf_matrix", l), t("analysis_rationale", l), t("specimen_data", l)])
     
     with res_tab1:
-        c1, c2 = st.columns([1, 1])
-        with c1:
-            st.markdown("#### Similarity Heatmap")
-            fig_h, ax_h = plt.subplots(figsize=(6, 5), facecolor='none')
-            sns.heatmap(sim_matrix, annot=True, fmt=".2f", cmap="vlag", xticklabels=file_names, yticklabels=file_names, 
-                        ax=ax_h, cbar=False)
-            plt.setp(ax_h.get_xticklabels(), rotation=45, ha="right", color="#565f89")
-            plt.setp(ax_h.get_yticklabels(), color="#565f89")
-            ax_h.set_title("Pairwise Scores", color="#a9b1d6")
+        st.markdown(f"### {t('prob_gauge', l)}")
+        bd = comp["decision_detail"]["effective_boundaries"]
+        diff_bz = bd["different_below"] * 100
+        same_bz = bd["same_above"] * 100
+        current_p = comp["calibrated_probability"] * 100
+        
+        gauge_color = "#76ff03" if comp['decision'] == 'same' else "#ff1744" if comp['decision'] == 'different' else "#ffc107"
+        glow_box = f"box-shadow: 0 0 15px {gauge_color}, inset 0 0 5px {gauge_color};" 
+        
+        html_gauge = f'''
+        <div style="width: 100%; max-width: 800px; margin: 0 auto; padding: 20px 0; font-family: 'Inter', sans-serif;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #a9b1d6; font-size: 14px; font-weight: 600;">
+                <span>0%</span>
+                <span style="color: {gauge_color}; font-size: 20px; font-weight: 800; text-shadow: 0 0 10px {gauge_color}55;">{current_p:.1f}%</span>
+                <span>100%</span>
+            </div>
+            <div style="position: relative; width: 100%; height: 32px; background-color: #1a1b26; border-radius: 16px; overflow: hidden; display: flex; border: 1px solid #24283b; box-shadow: inset 0 0 15px rgba(0,0,0,0.8);">
+                <div style="position: absolute; left: 0; width: {diff_bz}%; background: linear-gradient(90deg, #4f101d, #ff1744); height: 100%; opacity: 0.85;"></div>
+                <div style="position: absolute; left: {diff_bz}%; width: {same_bz - diff_bz}%; background: linear-gradient(90deg, #e67e22, #f1c40f); height: 100%; opacity: 0.85;"></div>
+                <div style="position: absolute; left: {same_bz}%; width: {100 - same_bz}%; background: linear-gradient(90deg, #27ae60, #76ff03); height: 100%; opacity: 0.85;"></div>
+                <div style="position: absolute; top: -3px; left: {current_p}%; width: 6px; height: 38px; background-color: #ffffff; border-radius: 3px; {glow_box} transform: translateX(-50%); z-index: 10; transition: left 1s ease-out;"></div>
+            </div>
+            <div style="display: grid; grid-template-columns: {diff_bz}% {same_bz - diff_bz}% {100 - same_bz}%; width: 100%; margin-top: 15px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                <div style="color: #ff5252; text-align: left; white-space: nowrap; overflow: visible;">{t('DIFFERENT', l)}</div>
+                <div style="color: #ffd740; text-align: center; white-space: nowrap; overflow: visible; z-index: 1;">{t('UNCERTAIN', l)}</div>
+                <div style="color: #b2ff59; text-align: right; white-space: nowrap; overflow: visible;">{t('SAME', l)}</div>
+            </div>
+        </div>
+        '''
+        st.markdown(html_gauge, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if has_labels:
+            cols = st.columns(2)
+            c_heat = cols[0]
+            c_roc = cols[1]
+        else:
+            c_heat = st.container()
+            c_roc = None
+            
+        with c_heat:
+            st.markdown(f"#### {t('sim_heatmap', l)}")
+            fig_h, ax_h = plt.subplots(figsize=(8, 6), facecolor='none')
+            sns.heatmap(sim_matrix, annot=True, fmt=".2f", cmap="mako", xticklabels=file_names, yticklabels=file_names, 
+                        ax=ax_h, cbar=True, cbar_kws={'shrink': 0.8})
+            plt.setp(ax_h.get_xticklabels(), rotation=45, ha="right", color="#c0caf5", weight='bold')
+            plt.setp(ax_h.get_yticklabels(), color="#c0caf5", weight='bold')
+            ax_h.set_title(t('pairwise_scores', l), color="#c0caf5", pad=15, weight='bold')
+            ax_h.tick_params(colors='#a9b1d6')
             st.pyplot(fig_h)
             
-        with c2:
-            st.markdown("#### Probability Gauge")
-            bd = comp["decision_detail"]["effective_boundaries"]
-            gauge_fig, g_ax = plt.subplots(figsize=(8, 1))
-            g_ax.axhspan(0, 1, xmin=0, xmax=1, color="#16161e")
-            g_ax.axvspan(0, bd["different_below"], color="#ff1744", alpha=0.3)
-            g_ax.axvspan(bd["different_below"], bd["same_above"], color="#ffc107", alpha=0.3)
-            g_ax.axvspan(bd["same_above"], 1.0, color="#76ff03", alpha=0.3)
-            current_p = comp["calibrated_probability"]
-            g_ax.axvline(current_p, color="#7aa2f7", linewidth=4)
-            g_ax.set_xlim(0, 1)
-            g_ax.axis('off')
-            st.pyplot(gauge_fig)
-            
-            if has_labels:
-                st.markdown("#### ROC Curve")
+        if c_roc:
+            with c_roc:
+                st.markdown(f"#### {t('roc_curve', l)}")
                 fpr, tpr, auc = core.compute_roc_data(same_scores, diff_scores)
-                fig_roc, ax_roc = plt.subplots(figsize=(6, 4))
-                ax_roc.plot(fpr, tpr, color="#bb9af7", lw=2, label=f"AUC: {auc:.3f}")
+                fig_roc, ax_roc = plt.subplots(figsize=(8, 6), facecolor='none')
+                ax_roc.plot(fpr, tpr, color="#bb9af7", lw=3, label=f"AUC: {auc:.3f}")
+                ax_roc.fill_between(fpr, tpr, alpha=0.1, color="#bb9af7")
                 ax_roc.plot([0, 1], [0, 1], 'w--', alpha=0.2)
                 ax_roc.set_facecolor('#1a1b26')
-                ax_roc.tick_params(colors='#565f89')
-                ax_roc.legend(facecolor='#16161e', labelcolor='#a9b1d6')
+                ax_roc.spines['bottom'].set_color('#565f89')
+                ax_roc.spines['top'].set_visible(False) 
+                ax_roc.spines['right'].set_visible(False)
+                ax_roc.spines['left'].set_color('#565f89')
+                ax_roc.tick_params(colors='#a9b1d6')
+                ax_roc.legend(facecolor='#16161e', labelcolor='#a9b1d6', edgecolor='#565f89')
                 st.pyplot(fig_roc)
 
     with res_tab2:
-        st.markdown("#### System Explanation")
-        st.info(f"**Interpretation:** {comp['explanation']['decision_reason']}")
+        st.markdown(f"#### {t('system_explanation', l)}")
+        st.info(t("interpretation", l, reason=comp['explanation']['decision_reason']))
         
         expl_col1, expl_col2 = st.columns(2)
         with expl_col1:
-            st.markdown("**Evidence Highlights**")
+            st.markdown(t("evidence_highlights", l))
             for f in comp['explanation']['contributing_factors']:
                 st.write(f"✅ {f}")
         with expl_col2:
-            st.markdown("**Potential Risks**")
+            st.markdown(t("potential_risks", l))
             for f in comp['risk']['factors']:
                 st.write(f"⚠️ {f}")
             if comp['explanation']['uncertainty_reasons']:
@@ -305,49 +401,51 @@ if n > 1:
                     st.write(f"❓ {r}")
 
     with res_tab3:
-        st.markdown("#### File Telemetry")
+        st.markdown(f"#### {t('file_telemetry', l)}")
         m_data = []
         for fn in file_names:
             met = file_metrics[fn]
+            sq_tag = t("short", l) if met['short_audio_warning'] else t("good", l)
+            stab_lazy = f"{cached_stability_score(fn).get('score', 0):.3f}" if fn in [fa, fb] else t("pend", l)
             m_data.append({
-                "Specimen": fn,
-                "Speech (s)": f"{met['effective_speech_duration']:.2f}s",
-                "Ratio": f"{met['speech_ratio']:.1%}",
-                "RMS": f"{met['rms']:.4f}",
-                "Stability": f"{file_stabilities.get(fn, {}).get('score', 0):.3f}",
-                "Quality Tags": ", ".join(["Short" if met['short_audio_warning'] else "Good"])
+                t("specimen", l): fn,
+                t("speech_s", l): f"{met['effective_speech_duration']:.2f}s",
+                t("ratio", l): f"{met['speech_ratio']:.1%}",
+                t("rms", l): f"{met['rms']:.4f}",
+                t("stability_lazy", l): stab_lazy,
+                t("quality_tags", l): sq_tag
             })
         st.table(pd.DataFrame(m_data))
 
     # 5. Global Actions
     st.markdown("---")
-    if st.button("🚀 Run Full Adversarial Robustness Check", use_container_width=True):
-        with st.status("Performing stress tests...", expanded=True) as adv_status:
+    if st.button(t("run_full_adv", l), use_container_width=True):
+        with st.status(t("performing_stress", l), expanded=True) as adv_status:
             import adversarial
             file_paths = {fn: os.path.join("temp_audio", fn) for fn in file_names}
-            adv_rep = adversarial.generate_full_report(file_names, file_paths, sim_matrix, file_metrics, labels_mapped, 0.70, embeddings)
-            st.write("Adversarial battery complete.")
-            adv_status.update(label="Stress Tests Complete", state="complete")
+            adv_rep = adversarial.generate_full_report(file_names, file_paths, sim_matrix, file_metrics, labels_mapped, 0.70, embeddings, lang=l)
+            st.write(t("adv_battery_complete", l))
+            adv_status.update(label=t("stress_tests_complete", l), state="complete")
         
         # Display results in columns
         a_col1, a_col2 = st.columns(2)
         with a_col1:
-            st.markdown("##### Perturbation Results")
+            st.markdown(f"#### {t('perturbation_re', l)}")
             for p_test in adv_rep["perturbation_tests"]:
-                st.write(f"**{p_test['file']}**: Variance {p_test['variance']:.2e}")
+                st.write(f"**{p_test['file']}**: {t('variance_lbl', l)} {p_test['variance']:.2e}")
         with a_col2:
-            st.markdown("##### Consistency Exceptions")
+            st.markdown(f"#### {t('consistency_ex', l)}")
             if not adv_rep["failure_log"]:
-                st.success("No critical identity failures detected.")
+                st.success(t("no_critical_fail", l))
             else:
                 for fail in adv_rep["failure_log"]:
-                    st.error(f"Failure in {fail['file']} during {fail['perturbation']}")
+                    st.error(t("failure_in", l, file=fail['file'], test=fail['test'], issue=fail['issue']))
 
 else:
     # Empty State - Beautifully Designed
-    st.markdown("""
+    st.markdown(f"""
     <div style='text-align: center; padding: 100px;'>
-        <h2 style='color: #565f89;'>Welcome to the Intelligence Engine</h2>
-        <p style='color: #414868;'>Upload samples in the sidebar to begin biometric analysis.</p>
+        <h2 style='color: #565f89;'>{t("welcome", l)}</h2>
+        <p style='color: #414868;'>{t("upload_samples_side", l)}</p>
     </div>
     """, unsafe_allow_html=True)

@@ -18,6 +18,11 @@ temp_extract/
 *.tgz
 *.zip
 
+# Test / sample datasets
+test_audio/
+sample_dataset/
+mixed_quality_dataset/
+
 # Sensitive / debug files
 backend_out.txt
 error.txt

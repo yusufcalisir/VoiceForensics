@@ -4,6 +4,7 @@ torch._dynamo.disable()
 
 import numpy as np
 import warnings
+from translations import t
 from itertools import combinations
 
 # ---------------------------------------------------------------------------
@@ -689,7 +690,7 @@ class RiskScorer:
     """
 
     def compute(self, confidence, stability_score=None, stability_variance=None,
-                min_duration=10.0, inconsistency_penalty=0.0):
+                min_duration=10.0, inconsistency_penalty=0.0, lang="en"):
         """Return risk level, score, and contributing factors."""
         factors = []
         risk_terms = []
@@ -699,32 +700,32 @@ class RiskScorer:
             penalty = (0.80 - confidence) * 0.50
             risk_terms.append(penalty)
             if confidence < 0.50:
-                factors.append(f"Very low confidence ({confidence:.0%})")
+                factors.append(t("very_low_conf", lang, conf=confidence))
             else:
-                factors.append(f"Moderate confidence ({confidence:.0%})")
+                factors.append(t("mod_conf", lang, conf=confidence))
 
         # High instability
         if stability_score is not None and stability_score < 0.90:
             penalty = (0.90 - stability_score) * 0.80
             risk_terms.append(penalty)
-            factors.append(f"Low perturbation stability ({stability_score:.3f})")
+            factors.append(t("low_pert_stab", lang, stab=stability_score))
 
         if stability_variance is not None and stability_variance > 5e-4:
             penalty = min(0.20, stability_variance * 200.0)
             risk_terms.append(penalty)
-            factors.append(f"High stability variance ({stability_variance:.4e})")
+            factors.append(t("high_stab_var", lang, var=stability_variance))
 
         # Short duration
         if min_duration < 3.0:
             penalty = (3.0 - min_duration) / 3.0 * 0.30
             risk_terms.append(penalty)
-            factors.append(f"Short audio ({min_duration:.1f}s effective speech)")
+            factors.append(t("short_audio_fact", lang, dur=min_duration))
 
         # Inconsistency
         if inconsistency_penalty > 0.05:
             penalty = min(0.25, inconsistency_penalty * 0.50)
             risk_terms.append(penalty)
-            factors.append(f"Transitivity inconsistency (penalty={inconsistency_penalty:.2f})")
+            factors.append(t("trans_incon", lang, pen=inconsistency_penalty))
 
         risk_score = float(min(1.0, sum(risk_terms)))
 
@@ -738,7 +739,7 @@ class RiskScorer:
         return {
             "level": level,
             "score": round(risk_score, 4),
-            "factors": factors if factors else ["No significant risk factors identified"],
+            "factors": factors if factors else [t("no_risk_fact", lang)],
         }
 
 
@@ -751,7 +752,7 @@ class ExplanationEngine:
 
     def explain(self, decision_result, confidence_result, risk_result,
                 metrics_a, metrics_b, stability_info,
-                raw_score, calibrated_prob, file_a="File A", file_b="File B"):
+                raw_score, calibrated_prob, file_a="File A", file_b="File B", lang="en"):
         """Return structured explanation dict with natural language text."""
 
         decision = decision_result["decision"]
@@ -764,24 +765,11 @@ class ExplanationEngine:
 
         # --- Decision reason ---
         if decision == "same":
-            decision_reason = (
-                f"The calibrated probability ({prob:.1%}) exceeds the 'same speaker' "
-                f"threshold ({boundaries['same_above']:.1%}), indicating high likelihood "
-                f"that {file_a} and {file_b} contain the same speaker."
-            )
+            decision_reason = t("dec_reason_same", lang, prob=prob, same_above=boundaries["same_above"], file_a=file_a, file_b=file_b)
         elif decision == "different":
-            decision_reason = (
-                f"The calibrated probability ({prob:.1%}) falls below the 'different speaker' "
-                f"threshold ({boundaries['different_below']:.1%}), indicating high likelihood "
-                f"that {file_a} and {file_b} contain different speakers."
-            )
+            decision_reason = t("dec_reason_diff", lang, prob=prob, different_below=boundaries["different_below"], file_a=file_a, file_b=file_b)
         else:
-            decision_reason = (
-                f"The calibrated probability ({prob:.1%}) falls in the uncertain zone "
-                f"({boundaries['different_below']:.1%} – {boundaries['same_above']:.1%}). "
-                f"The system cannot confidently determine whether {file_a} and {file_b} "
-                f"contain the same or different speakers."
-            )
+            decision_reason = t("dec_reason_uncert", lang, prob=prob, different_below=boundaries["different_below"], same_above=boundaries["same_above"], file_a=file_a, file_b=file_b)
 
         # --- Contributing factors ---
         contributing = []
@@ -790,102 +778,80 @@ class ExplanationEngine:
         weakest = sorted_factors[0]
         strongest = sorted_factors[-1]
 
-        contributing.append(
-            f"Strongest factor: {strongest[0]} ({strongest[1]:.0%})")
-        contributing.append(
-            f"Weakest factor: {weakest[0]} ({weakest[1]:.0%})")
+        contributing.append(t("strongest_fact", lang, fact=strongest[0], val=strongest[1]))
+        contributing.append(t("weakest_fact", lang, fact=weakest[0], val=weakest[1]))
 
         if conf_factors["duration"] < 0.60:
-            contributing.append(
-                f"Short audio duration limits confidence "
-                f"(min effective speech: {confidence_result['min_duration']:.1f}s)")
+            contributing.append(t("short_audio_lim", lang, min_dur=confidence_result["min_duration"]))
         if conf_factors["stability"] < 0.70:
-            contributing.append(
-                "Perturbation stability is low — embeddings vary significantly "
-                "under minor audio modifications")
+            contributing.append(t("pert_stab_low", lang))
         if conf_factors["inconsistency"] < 0.80:
-            contributing.append(
-                "Transitivity violations detected — the similarity relationships "
-                "across files are not fully consistent")
+            contributing.append(t("trans_viol", lang))
 
         # --- Uncertainty reasons ---
         uncertainty_reasons = []
         if decision == "uncertain":
-            uncertainty_reasons.append(
-                f"The probability ({prob:.1%}) is in the ambiguous mid-range")
+            uncertainty_reasons.append(t("prob_ambig", lang, prob=prob))
         if conf < 0.50:
-            uncertainty_reasons.append(
-                f"Overall confidence is very low ({conf:.0%})")
+            uncertainty_reasons.append(t("overall_conf_low", lang, conf=conf))
         if risk_level == "high":
-            uncertainty_reasons.append(
-                f"Risk score is high — multiple quality/stability issues detected")
+            uncertainty_reasons.append(t("risk_high_mult", lang))
 
         adj = decision_result.get("boundary_adjustments", {})
         if adj.get("stability_penalty", 0) > 0.01:
-            uncertainty_reasons.append(
-                f"Decision boundaries were widened due to low stability "
-                f"(penalty: {adj['stability_penalty']:.2f})")
+            uncertainty_reasons.append(t("bound_widened", lang, pen=adj["stability_penalty"]))
 
         # --- Warnings ---
         warn_list = []
         dur_a = metrics_a.get("effective_speech_duration", 0)
         dur_b = metrics_b.get("effective_speech_duration", 0)
         if dur_a < 3.0:
-            warn_list.append(f"{file_a} has very short speech ({dur_a:.1f}s)")
+            warn_list.append(t("file_short_speech", lang, file=file_a, dur=dur_a))
         if dur_b < 3.0:
-            warn_list.append(f"{file_b} has very short speech ({dur_b:.1f}s)")
+            warn_list.append(t("file_short_speech", lang, file=file_b, dur=dur_b))
         if metrics_a.get("has_clipping"):
-            warn_list.append(f"{file_a} shows audio clipping")
+            warn_list.append(t("file_clip", lang, file=file_a))
         if metrics_b.get("has_clipping"):
-            warn_list.append(f"{file_b} shows audio clipping")
+            warn_list.append(t("file_clip", lang, file=file_b))
         if metrics_a.get("low_volume"):
-            warn_list.append(f"{file_a} has very low volume")
+            warn_list.append(t("file_low_vol", lang, file=file_a))
         if metrics_b.get("low_volume"):
-            warn_list.append(f"{file_b} has very low volume")
+            warn_list.append(t("file_low_vol", lang, file=file_b))
 
         if stability_info:
             if stability_info.get("variance", 0) > 1e-3:
-                warn_list.append(
-                    f"High perturbation variance ({stability_info['variance']:.4e}) — "
-                    f"comparison may be unreliable")
+                warn_list.append(t("high_pert_var", lang, var=stability_info["variance"]))
 
         # --- Potential failure reasons ---
         failure_reasons = []
         if raw_score > 0.40 and raw_score < 0.70:
             failure_reasons.append(
-                "Raw similarity is in the ambiguous range — both same-speaker "
-                "and different-speaker pairs can produce scores in this region")
+                t("raw_sim_ambig", lang))
         if conf_factors["quality"] < 0.60:
             failure_reasons.append(
-                "Poor audio quality may distort embeddings, leading to "
-                "unreliable similarity scores")
+                t("poor_audio", lang))
         if conf_factors["duration"] < 0.50:
             failure_reasons.append(
-                "Insufficient speech content — ECAPA-TDNN embeddings are less "
-                "discriminative with very short utterances")
+                t("insuf_speech", lang))
 
         return {
             "decision_reason": decision_reason,
             "contributing_factors": contributing,
-            "uncertainty_reasons": uncertainty_reasons if uncertainty_reasons else ["No significant uncertainty factors"],
-            "warnings": warn_list if warn_list else ["No warnings"],
-            "potential_failure_reasons": failure_reasons if failure_reasons else ["No identified failure risks"],
-            "summary": self._build_summary(decision, prob, conf, risk_level),
+            "uncertainty_reasons": uncertainty_reasons if uncertainty_reasons else [t("no_uncert_fact", lang)],
+            "warnings": warn_list if warn_list else [t("no_warn", lang)],
+            "potential_failure_reasons": failure_reasons if failure_reasons else [t("no_fail_risks", lang)],
+            "summary": self._build_summary(decision, prob, conf, risk_level, lang),
         }
 
-    def _build_summary(self, decision, prob, conf, risk_level):
+    def _build_summary(self, decision, prob, conf, risk_level, lang="en"):
         """One-sentence executive summary."""
-        risk_desc = {"low": "low risk", "medium": "moderate risk", "high": "high risk"}
+        risk_desc = {"low": t("low_risk", lang), "medium": t("mod_risk", lang), "high": t("high_risk", lang)}
         if decision == "same":
-            return (f"Speakers are likely the SAME (probability {prob:.0%}, "
-                    f"confidence {conf:.0%}, {risk_desc[risk_level]}).")
+            return t("summ_same", lang, prob=prob, conf=conf, risk=risk_desc[risk_level])
         elif decision == "different":
-            return (f"Speakers are likely DIFFERENT (probability {prob:.0%}, "
-                    f"confidence {conf:.0%}, {risk_desc[risk_level]}).")
+            return t("summ_diff", lang, prob=prob, conf=conf, risk=risk_desc[risk_level])
         else:
-            return (f"UNCERTAIN — the system cannot make a reliable determination "
-                    f"(probability {prob:.0%}, confidence {conf:.0%}, "
-                    f"{risk_desc[risk_level]}).")
+            return t("summ_uncert", lang, prob=prob, conf=conf, risk=risk_desc[risk_level])
 
 
 # ===========================================================================
@@ -1028,7 +994,7 @@ def compare_speakers(metrics_a, metrics_b, embeddings_a, embeddings_b,
                      pairwise_stability=None,
                      inconsistency_penalty=0.0,
                      calibrator=None,
-                     file_a="File A", file_b="File B"):
+                     file_a="File A", file_b="File B", lang="en"):
     """
     Full decision pipeline for a single speaker pair.
     
@@ -1091,6 +1057,7 @@ def compare_speakers(metrics_a, metrics_b, embeddings_a, embeddings_b,
         stability_variance=stab_var,
         min_duration=min_dur,
         inconsistency_penalty=inconsistency_penalty,
+        lang=lang
     )
 
     # 7. Explanation
@@ -1099,6 +1066,7 @@ def compare_speakers(metrics_a, metrics_b, embeddings_a, embeddings_b,
         decision_result, conf_result, risk_result,
         metrics_a, metrics_b, stability_info,
         raw_sim, cal_prob, file_a, file_b,
+        lang=lang
     )
 
     return {

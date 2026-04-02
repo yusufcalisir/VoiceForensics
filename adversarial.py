@@ -13,6 +13,7 @@ import torch
 import warnings
 from itertools import combinations
 import core
+from translations import t
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +322,7 @@ def compute_inconsistency_score(sim_matrix, file_names, threshold):
 # ---------------------------------------------------------------------------
 
 def generate_full_report(file_names, file_paths, sim_matrix, file_metrics,
-                         labels_mapped, threshold, embeddings):
+                         labels_mapped, threshold, embeddings, lang="en"):
     """
     Run all adversarial tests and return a structured report dict.
     """
@@ -351,7 +352,7 @@ def generate_full_report(file_names, file_paths, sim_matrix, file_metrics,
                 report["failure_log"].append({
                     "test": "perturbation",
                     "file": fn,
-                    "issue": f"High variance ({pt['variance']:.4e}), min sim={pt['min']:.4f}",
+                    "issue": t("adv_issue_var", lang, var=pt["variance"], min_sim=pt["min"]),
                 })
 
         # Segment test
@@ -363,7 +364,7 @@ def generate_full_report(file_names, file_paths, sim_matrix, file_metrics,
                 report["failure_log"].append({
                     "test": "segment_consistency",
                     "file": fn,
-                    "issue": f"Spread={st_res['spread']:.4f} across begin/mid/end",
+                    "issue": t("adv_issue_spread", lang, spread=st_res["spread"]),
                 })
 
         # Identity test
@@ -375,7 +376,7 @@ def generate_full_report(file_names, file_paths, sim_matrix, file_metrics,
                 report["failure_log"].append({
                     "test": "identity_stability",
                     "file": fn,
-                    "issue": f"{id_res['n_failed']} near-identical modification(s) deviated from expected",
+                    "issue": t("adv_issue_ident", lang, n=id_res["n_failed"]),
                 })
 
     # Cross-file tests (require labels)
