@@ -129,12 +129,36 @@ st.markdown("""
         border-bottom: 2px solid #7aa2f7 !important;
     }
     
-    /* Removing the "forensic" cramped margins */
+    /* Removed existing margins */
     .stPlotlyChart, .stImage, .stPyplot {
         margin-top: 1.5rem;
         margin-bottom: 2rem;
     }
     
+    /* MOBILE RESPONSIVENESS */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 1rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+        }
+        h1 {
+            font-size: 1.8rem !important;
+        }
+        .stMetric {
+            padding: 1rem !important;
+        }
+        [data-testid="stMetricValue"] {
+            font-size: 1.5rem !important;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 10px;
+        }
+        .stTabs [data-baseweb="tab"] {
+            font-size: 0.8rem !important;
+            padding: 5px !important;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -330,21 +354,21 @@ if n > 1:
         
         html_gauge = f'''
         <div style="width: 100%; max-width: 800px; margin: 0 auto; padding: 20px 0; font-family: 'Inter', sans-serif;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #a9b1d6; font-size: 14px; font-weight: 600;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #a9b1d6; font-size: clamp(12px, 3vw, 14px); font-weight: 600;">
                 <span>0%</span>
-                <span style="color: {gauge_color}; font-size: 20px; font-weight: 800; text-shadow: 0 0 10px {gauge_color}55;">{current_p:.1f}%</span>
+                <span style="color: {gauge_color}; font-size: clamp(16px, 5vw, 20px); font-weight: 800; text-shadow: 0 0 10px {gauge_color}55;">{current_p:.1f}%</span>
                 <span>100%</span>
             </div>
-            <div style="position: relative; width: 100%; height: 32px; background-color: #1a1b26; border-radius: 16px; overflow: hidden; display: flex; border: 1px solid #24283b; box-shadow: inset 0 0 15px rgba(0,0,0,0.8);">
+            <div style="position: relative; width: 100%; height: clamp(20px, 5vw, 32px); background-color: #1a1b26; border-radius: 16px; overflow: hidden; display: flex; border: 1px solid #24283b; box-shadow: inset 0 0 15px rgba(0,0,0,0.8);">
                 <div style="position: absolute; left: 0; width: {diff_bz}%; background: linear-gradient(90deg, #4f101d, #ff1744); height: 100%; opacity: 0.85;"></div>
                 <div style="position: absolute; left: {diff_bz}%; width: {same_bz - diff_bz}%; background: linear-gradient(90deg, #e67e22, #f1c40f); height: 100%; opacity: 0.85;"></div>
                 <div style="position: absolute; left: {same_bz}%; width: {100 - same_bz}%; background: linear-gradient(90deg, #27ae60, #76ff03); height: 100%; opacity: 0.85;"></div>
-                <div style="position: absolute; top: -3px; left: {current_p}%; width: 6px; height: 38px; background-color: #ffffff; border-radius: 3px; {glow_box} transform: translateX(-50%); z-index: 10; transition: left 1s ease-out;"></div>
+                <div style="position: absolute; top: -3px; left: {current_p}%; width: 4px; height: 120%; background-color: #ffffff; border-radius: 3px; {glow_box} transform: translateX(-50%); z-index: 10; transition: left 1s ease-out;"></div>
             </div>
-            <div style="display: grid; grid-template-columns: {diff_bz}% {same_bz - diff_bz}% {100 - same_bz}%; width: 100%; margin-top: 15px; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
-                <div style="color: #ff5252; text-align: left; white-space: nowrap; overflow: visible;">{t('DIFFERENT', l)}</div>
-                <div style="color: #ffd740; text-align: center; white-space: nowrap; overflow: visible; z-index: 1;">{t('UNCERTAIN', l)}</div>
-                <div style="color: #b2ff59; text-align: right; white-space: nowrap; overflow: visible;">{t('SAME', l)}</div>
+            <div style="display: flex; justify-content: space-between; width: 100%; margin-top: 15px; font-size: clamp(9px, 2.5vw, 12px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                <div style="color: #ff5252; text-align: left;">{t('DIFFERENT', l)}</div>
+                <div style="color: #ffd740; text-align: center;">{t('UNCERTAIN', l)}</div>
+                <div style="color: #b2ff59; text-align: right;">{t('SAME', l)}</div>
             </div>
         </div>
         '''
@@ -419,7 +443,7 @@ if n > 1:
                 t("stability_lazy", l): stab_lazy,
                 t("quality_tags", l): sq_tag
             })
-        st.table(pd.DataFrame(m_data))
+        st.dataframe(pd.DataFrame(m_data), use_container_width=True, hide_index=True)
 
     # 5. Global Actions
     st.markdown("---")
