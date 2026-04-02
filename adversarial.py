@@ -350,7 +350,7 @@ def generate_full_report(file_names, file_paths, sim_matrix, file_metrics,
             report["perturbation_tests"].append(pt)
             if pt["variance"] > 1e-3:
                 report["failure_log"].append({
-                    "test": "perturbation",
+                    "test": t("test_perturbation", lang),
                     "file": fn,
                     "issue": t("adv_issue_var", lang, var=pt["variance"], min_sim=pt["min"]),
                 })
@@ -362,7 +362,7 @@ def generate_full_report(file_names, file_paths, sim_matrix, file_metrics,
             report["segment_tests"].append(st_res)
             if st_res["flagged"]:
                 report["failure_log"].append({
-                    "test": "segment_consistency",
+                    "test": t("test_segment_consistency", lang),
                     "file": fn,
                     "issue": t("adv_issue_spread", lang, spread=st_res["spread"]),
                 })
@@ -374,7 +374,7 @@ def generate_full_report(file_names, file_paths, sim_matrix, file_metrics,
             report["identity_tests"].append(id_res)
             if not id_res["all_passed"]:
                 report["failure_log"].append({
-                    "test": "identity_stability",
+                    "test": t("test_identity_stability", lang),
                     "file": fn,
                     "issue": t("adv_issue_ident", lang, n=id_res["n_failed"]),
                 })
