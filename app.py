@@ -204,13 +204,15 @@ def cached_stability_score(safe_path):
 with st.sidebar:
     st.image("https://img.icons8.com/isometric/512/microphone.png", width=60)
     
-    colTR, colEN = st.columns(2)
-    if colEN.button("🇬🇧 EN", use_container_width=True): 
-        st.session_state.lang = "en"
-        st.rerun()
-    if colTR.button("🇹🇷 TR", use_container_width=True): 
-        st.session_state.lang = "tr"
-        st.rerun()
+    # Language Toggle Button
+    if st.session_state.lang == "en":
+        if st.button("🇹🇷 TR", use_container_width=True):
+            st.session_state.lang = "tr"
+            st.rerun()
+    else:
+        if st.button("🇬🇧 EN", use_container_width=True):
+            st.session_state.lang = "en"
+            st.rerun()
     l = st.session_state.lang
 
     st.title(t("settings", l))
