@@ -145,17 +145,20 @@ st.markdown("""
 @st.cache_data(show_spinner=False)
 def cached_audio_process(file_bytes_hash, file_name, file_bytes):
     os.makedirs("temp_audio", exist_ok=True)
-    temp_path = os.path.join("temp_audio", file_name)
+    safe_name = f"{file_bytes_hash}_{file_name}"
+    temp_path = os.path.join("temp_audio", safe_name)
     with open(temp_path, "wb") as f_out:
         f_out.write(file_bytes)
-    return core.process_audio(temp_path)
+    res = core.process_audio(temp_path)
+    if isinstance(res, dict):
+        res["safe_path"] = temp_path
+    return res
 
 @st.cache_data(show_spinner=False)
-def cached_stability_score(file_name):
-    temp_path = os.path.join("temp_audio", file_name)
-    if os.path.exists(temp_path):
-        return core.compute_stability_score(temp_path)
-    return {"score": 0.0, "details": t("file_missing", l)}
+def cached_stability_score(safe_path):
+    if os.path.exists(safe_path):
+        return core.compute_stability_score(safe_path)
+    return {"score": 0.0, "details": "File missing"}
 
 # ==========================================
 # SIDEBAR: Control Panel
@@ -222,7 +225,7 @@ st.title(t("speaker_id_intel", l))
 
 if n > 1:
     # 1. Background Loading
-    file_metrics, embeddings, file_names, file_stabilities = {}, {}, [], {}
+    file_metrics, embeddings, file_names, file_paths = {}, {}, [], {}
     
     with st.status(t("analyzing_specimens", l), expanded=False) as status:
         for f in uploaded_files:
@@ -233,6 +236,7 @@ if n > 1:
                 file_metrics[f.name] = res
                 embeddings[f.name] = res["embeddings"]
                 file_names.append(f.name)
+                file_paths[f.name] = res.get("safe_path", os.path.join("temp_audio", f"{fb_hash}_{f.name}"))
             f.seek(0)
         status.update(label=t("initial_ingestion_complete", l), state="complete", expanded=False)
 
@@ -278,13 +282,13 @@ if n > 1:
     with col_sel1: fa = st.selectbox(t("file_a", l), file_names, index=0)
     with col_sel2: fb = st.selectbox(t("file_b", l), file_names, index=1 if n_proc > 1 else 0)
     
-    path_a = os.path.join("temp_audio", fa)
-    path_b = os.path.join("temp_audio", fb)
+    path_a = file_paths[fa]
+    path_b = file_paths[fb]
     
     with st.spinner(t("computing_precision", l)):
         pair_stab = core.compute_pairwise_perturbation_stability(path_a, path_b)
-        stab_a = cached_stability_score(fa)
-        stab_b = cached_stability_score(fb)
+        stab_a = cached_stability_score(path_a)
+        stab_b = cached_stability_score(path_b)
     
     idx1, idx2 = file_names.index(fa), file_names.index(fb)
     penalties, _ = core.calculate_transitivity(sim_matrix, file_names, ui_strong_sim_threshold=trans_boundary)
@@ -406,7 +410,7 @@ if n > 1:
         for fn in file_names:
             met = file_metrics[fn]
             sq_tag = t("short", l) if met['short_audio_warning'] else t("good", l)
-            stab_lazy = f"{cached_stability_score(fn).get('score', 0):.3f}" if fn in [fa, fb] else t("pend", l)
+            stab_lazy = f"{cached_stability_score(file_paths[fn]).get('score', 0):.3f}" if fn in [fa, fb] else t("pend", l)
             m_data.append({
                 t("specimen", l): fn,
                 t("speech_s", l): f"{met['effective_speech_duration']:.2f}s",
@@ -422,7 +426,6 @@ if n > 1:
     if st.button(t("run_full_adv", l), use_container_width=True):
         with st.status(t("performing_stress", l), expanded=True) as adv_status:
             import adversarial
-            file_paths = {fn: os.path.join("temp_audio", fn) for fn in file_names}
             adv_rep = adversarial.generate_full_report(file_names, file_paths, sim_matrix, file_metrics, labels_mapped, 0.70, embeddings, lang=l)
             st.write(t("adv_battery_complete", l))
             adv_status.update(label=t("stress_tests_complete", l), state="complete")

@@ -6,6 +6,7 @@ import numpy as np
 import warnings
 from translations import t
 from itertools import combinations
+import threading
 
 # ---------------------------------------------------------------------------
 # Model loading (cached natively to decouple from Streamlit)
@@ -14,27 +15,32 @@ from itertools import combinations
 _SILERO_MODEL = None
 _SILERO_UTILS = None
 _ECAPA_MODEL = None
+_MODEL_LOCK = threading.Lock()
 
 def load_silero_vad():
     global _SILERO_MODEL, _SILERO_UTILS
     if _SILERO_MODEL is None:
-        _SILERO_MODEL, _SILERO_UTILS = torch.hub.load(
-            repo_or_dir='snakers4/silero-vad',
-            model='silero_vad',
-            force_reload=False,
-            trust_repo=True,
-        )
+        with _MODEL_LOCK:
+            if _SILERO_MODEL is None:
+                _SILERO_MODEL, _SILERO_UTILS = torch.hub.load(
+                    repo_or_dir='snakers4/silero-vad',
+                    model='silero_vad',
+                    force_reload=False,
+                    trust_repo=True,
+                )
     return _SILERO_MODEL, _SILERO_UTILS
 
 
 def load_ecapa_model():
     global _ECAPA_MODEL
     if _ECAPA_MODEL is None:
-        from speechbrain.inference.speaker import EncoderClassifier
-        _ECAPA_MODEL = EncoderClassifier.from_hparams(
-            source="speechbrain/spkrec-ecapa-voxceleb",
-            run_opts={"device": "cuda" if torch.cuda.is_available() else "cpu"},
-        )
+        with _MODEL_LOCK:
+            if _ECAPA_MODEL is None:
+                from speechbrain.inference.speaker import EncoderClassifier
+                _ECAPA_MODEL = EncoderClassifier.from_hparams(
+                    source="speechbrain/spkrec-ecapa-voxceleb",
+                    run_opts={"device": "cuda" if torch.cuda.is_available() else "cpu"},
+                )
     return _ECAPA_MODEL
 
 # ---------------------------------------------------------------------------
