@@ -12,6 +12,10 @@ from translations import t
 # Handle Lang
 if "lang" not in st.session_state:
     st.session_state.lang = "en"
+
+def toggle_lang():
+    st.session_state.lang = "tr" if st.session_state.lang == "en" else "en"
+
 l = st.session_state.lang
 
 # Dynamic JS Translator for hardcoded Streamlit elements
@@ -205,14 +209,8 @@ with st.sidebar:
     st.image("https://img.icons8.com/isometric/512/microphone.png", width=60)
     
     # Language Toggle Button
-    if st.session_state.lang == "en":
-        if st.button("🇹🇷 TR", use_container_width=True):
-            st.session_state.lang = "tr"
-            st.rerun()
-    else:
-        if st.button("🇬🇧 EN", use_container_width=True):
-            st.session_state.lang = "en"
-            st.rerun()
+    btn_label = "🇹🇷 TR" if st.session_state.lang == "en" else "🇬🇧 EN"
+    st.button(btn_label, on_click=toggle_lang, use_container_width=True)
     l = st.session_state.lang
 
     st.title(t("settings", l))
