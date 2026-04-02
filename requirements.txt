@@ -9,3 +9,4 @@ matplotlib
 scipy
 scikit-learn
 soundfile
+torchvision

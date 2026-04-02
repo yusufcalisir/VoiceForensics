@@ -74,6 +74,30 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         font-weight: 800;
         letter-spacing: -1px;
+        font-size: clamp(1.8rem, 6vw, 3rem) !important;
+        line-height: 1.2;
+    }
+    h2 {
+        font-size: clamp(1.4rem, 5vw, 2.2rem) !important;
+    }
+    
+    /* Welcome Container Responsive */
+    .welcome-container {
+        text-align: center;
+        padding: 8vh 5vw;
+        max-width: 100%;
+        margin: 0 auto;
+    }
+    .welcome-container h2 {
+        color: #7aa2f7;
+        margin-bottom: 20px;
+        overflow-wrap: break-word;
+    }
+    .welcome-container p {
+        color: #565f89;
+        font-size: 1.1rem;
+        max-width: 600px;
+        margin: 0 auto;
     }
     
     /* Card / Container Styling */
@@ -139,24 +163,14 @@ st.markdown("""
     @media (max-width: 768px) {
         .block-container {
             padding-top: 1rem !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-        }
-        h1 {
-            font-size: 1.8rem !important;
+            padding-left: 0.8rem !important;
+            padding-right: 0.8rem !important;
         }
         .stMetric {
-            padding: 1rem !important;
+            padding: 0.8rem !important;
         }
         [data-testid="stMetricValue"] {
-            font-size: 1.5rem !important;
-        }
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 10px;
-        }
-        .stTabs [data-baseweb="tab"] {
-            font-size: 0.8rem !important;
-            padding: 5px !important;
+            font-size: 1.4rem !important;
         }
     }
 </style>
@@ -471,8 +485,8 @@ if n > 1:
 else:
     # Empty State - Beautifully Designed
     st.markdown(f"""
-    <div style='text-align: center; padding: 100px;'>
-        <h2 style='color: #565f89;'>{t("welcome", l)}</h2>
-        <p style='color: #414868;'>{t("upload_samples_side", l)}</p>
+    <div class='welcome-container'>
+        <h2>{t("welcome", l)}</h2>
+        <p>{t("upload_samples_side", l)}</p>
     </div>
     """, unsafe_allow_html=True)
